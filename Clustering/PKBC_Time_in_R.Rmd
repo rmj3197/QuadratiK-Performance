@@ -1,0 +1,90 @@
+# PKBD Clustering Time in R for Various Datasets
+```{r}
+system_specifications <- list(
+    OS = Sys.info()["sysname"],
+    R_version = R.version.string,
+    CPU = Sys.info()["machine"],
+    # https://stackoverflow.com/questions/22662770/how-to-calculate-virtual-memory-size-in-mavericks
+    RAM = as.numeric(system("sysctl -n hw.memsize", intern = TRUE)) / (1024^3) # RAM in GB
+)
+print(system_specifications)
+```
+```{r}
+# Loading required libraries
+
+library(jsonlite)
+library(QuadratiK)
+```
+```{r}
+# Function to perform clustering
+
+perform_pkbc_clustering <- function(file_path, num_clusters) {
+    df <- read.csv(file_path)
+
+    if (file_path == "digits_embeddings.csv") {
+        embeddings <- df[, -ncol(df)]
+    } else if (file_path == "birch_dataset.csv") {
+        embeddings <- df / sqrt(rowSums(df^2))
+    } else {
+        return_embeddings <- function(x) {
+            fromJSON(x)
+        }
+
+        df$embedding <- lapply(df$ada_embedding, return_embeddings)
+        embeddings <- do.call(rbind, df$embedding)
+        embeddings <- embeddings / sqrt(rowSums(embeddings^2))
+    }
+
+    start_time <- Sys.time()
+    res_pk <- pkbc(as.matrix(embeddings), num_clusters)
+    end_time <- Sys.time()
+
+    computation_time <- as.numeric(difftime(end_time, start_time, units = "secs"))
+    print(computation_time)
+
+    return(computation_time)
+}
+```
+```{r}
+datasets <- list(
+    birch = list(file = "birch_dataset.csv", clusters = 3),
+    newsgroup20 = list(file = "embeddings_news_all_256.csv", clusters = 20),
+    reddit = list(file = "reddit_384.csv", clusters = 19),
+    stackexchange = list(file = "embeddings_stk_128.csv", clusters = 15),
+    newsgroup3 = list(file = "embeddings_news_256.csv", clusters = 3),
+    arxiv = list(file = "embeddings_arxiv_test_128.csv", clusters = 11),
+    uciml = list(file = "digits_embeddings.csv", clusters = 10),
+    detectai = list(file = "embeddings_ai_detect_32.csv", clusters = 2)
+)
+```
+```{r}
+# Define output file
+output_file <- "Time_in_R.csv"
+
+# Create CSV file with headers if it doesn’t exist
+if (!file.exists(output_file)) {
+    write.table(data.frame(Dataset = character(), Run = integer(), ComputationTime = numeric()),
+        file = output_file, sep = ",", row.names = FALSE, col.names = TRUE
+    )
+}
+
+# Run clustering and save results after each run
+for (dataset_name in names(datasets)) {
+    cat("Processing dataset:", dataset_name, "\n")
+    dataset <- datasets[[dataset_name]]
+
+    for (i in 1:10) {
+        cat("Run", i, "\n")
+        computation_time <- perform_pkbc_clustering(dataset$file, dataset$clusters)
+
+        # Append results to CSV after each run
+        write.table(data.frame(Dataset = dataset_name, Run = i, ComputationTime = computation_time),
+            file = output_file, sep = ",", row.names = FALSE, col.names = FALSE, append = TRUE
+        )
+    }
+}
+
+cat("All runs completed. Results saved in", output_file, "\n")
+
+```
+

@@ -1,0 +1,40 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+```{r}
+library(QuadratiK)
+library(sn)
+library(dplyr)
+```
+
+```{r}
+# Function to measure execution time in seconds for different alpha values
+measure_time <- function(alpha_value) {
+  x <- matrix(rnorm(200), ncol = 4)
+  y <- matrix(rmsn(200, xi = c(0, 0, 0, 0), Omega = diag(1, 4, 4), alpha = rep(alpha_value, 4)), ncol = 4)
+  
+  start_time <- Sys.time()
+  h_sel <- select_h(x, y, alternative = "skewness", n_cores = 8)
+  end_time <- Sys.time()
+  
+  return(as.numeric(difftime(end_time, start_time, units = "secs")))
+}
+
+# Run 10 times for each alpha value and store execution times
+alpha_values <- c(0.5, 0.05)
+results <- lapply(alpha_values, function(alpha) {
+  times <- replicate(10, measure_time(alpha))
+  data.frame(Alpha = alpha, Execution_Time_Seconds = times)
+})
+
+# Combine results into a single dataframe
+time_df <- bind_rows(results)
+
+# Print the dataframe
+print(time_df)
+write.csv(time_df, "h_selection_time_in_R.csv", row.names = FALSE)
+```
+
